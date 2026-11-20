@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block titulo %}{% endblock %} · Controle de Acesso Facial</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
+</head>
+<body>
+<header>
+  <h1>🔐 Controle de Acesso Facial</h1>
+  <nav>
+    <a href="/cadastro" class="{{ 'atual' if request.path=='/cadastro' }}">Cadastro</a>
+  </nav>
+</header>
+{% block conteudo %}{% endblock %}
+<script src="{{ url_for('static', filename='camera.js') }}"></script>
+{% block script %}{% endblock %}
+</body>
+</html>
