@@ -1,0 +1,6 @@
+.venv/
+venv/
+.idea/
+rostos_cadastrados/
+__pycache__/
+*.pyc
