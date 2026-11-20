@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block titulo %}Cadastro{% endblock %}
+{% block conteudo %}
+<main>
+  <section class="card">
+    <h2>Captura do rosto</h2>
+    <div class="palco">
+      <div class="espelho"><video id="video" playsinline muted></video><canvas id="sobre"></canvas></div>
+      <div class="faixa" id="instrucao">Clique em “Iniciar captura”</div>
+    </div>
+    <div class="passos" id="passos"></div>
+    <div class="debug" id="debug"></div>
+    <select id="camSel" style="margin-top:8px;display:none"></select>
+  </section>
+  <aside style="display:flex;flex-direction:column;gap:20px">
+    <section class="card">
+      <h2>Novo cadastro</h2>
+      <label>Nome completo</label><input id="nome" placeholder="Ex.: Maria da Silva">
+      <label>Tipo</label>
+      <select id="tipo"><option>Morador</option><option>Aluno</option><option>Funcionário</option><option>Visitante</option></select>
+      <button id="btnIniciar">Iniciar captura</button>
+      <button id="btnSalvar" disabled>Salvar cadastro</button>
+      <div id="aviso"></div>
+    </section>
+    <section class="card">
+      <h2>Pessoas cadastradas</h2>
+      <div class="lista" id="lista"></div>
+    </section>
+  </aside>
+</main>
+{% endblock %}
+{% block script %}
+<script>
+const $ = id => document.getElementById(id);
+const video = $('video'), sobre = $('sobre'), tmp = document.createElement('canvas');
+let sessao = null, rodando = false, completo = false;
+const ROT = {frente: 'De frente', esquerda: 'Um lado', direita: 'Lado oposto'};
+
+function aviso(txt, cls) { $('aviso').innerHTML = txt ? `<div class="msg ${cls||''}">${txt}</div>` : ''; }
+
+function desenharPassos(prog) {
+  let atual = true;
+  $('passos').innerHTML = prog.map(p => {
+    const feito = p.tem >= p.precisa;
+    const cls = feito ? 'feito' : (atual ? 'atual' : ''); if (!feito) atual = false;
+    return `<div class="passo ${cls}">${feito ? '✓ ' : ''}${ROT[p.pose]}<br>${p.tem}/${p.precisa}</div>`;
+  }).join('');
+}
+
+async function laco() {
+  while (rodando) {
+    const t0 = performance.now();
+    try {
+      const blob = await Camera.capturar(video, tmp);
+      const r = await (await fetch('/api/cadastro/frame?sessao=' + sessao, {method: 'POST', body: blob})).json();
+      if (!rodando) break;
+      desenharPassos(r.progresso);
+      $('instrucao').textContent = r.mensagem || '';
+      Camera.caixa(sobre, video, r.caixa, r.alerta ? '#f59e0b' : (r.ok ? '#22c55e' : '#3b82f6'));
+      $('debug').textContent = r.largura ? `rosto com ${Math.round(r.largura)}px de largura` : '';
+      if (r.completo && !completo) { completo = true; $('btnSalvar').disabled = false; }
+    } catch (e) { $('instrucao').textContent = 'Erro de comunicação com o servidor'; await esperar(1000); }
+    await esperar(Math.max(0, 120 - (performance.now() - t0)));
+  }
+}
+
+$('btnIniciar').onclick = async () => {
+  aviso('');
+  try {
+    const dim = await Camera.abrir(video, $('camSel').value || undefined);
+    $('debug').textContent = `câmera em ${dim.w}x${dim.h}`;
+    const cams = await Camera.listar();
+    if (cams.length > 1 && !$('camSel').options.length) {
+      $('camSel').innerHTML = cams.map((c, i) => `<option value="${c.deviceId}">${c.label || 'Câmera ' + (i+1)}</option>`).join('');
+      $('camSel').style.display = 'block';
+      $('camSel').onchange = () => $('btnIniciar').click();
+    }
+  } catch (e) { aviso('Não foi possível abrir a câmera: ' + e.message, 'erro'); return; }
+  const r = await (await fetch('/api/cadastro/iniciar', {method: 'POST'})).json();
+  sessao = r.sessao; completo = false; $('btnSalvar').disabled = true;
+  desenharPassos(r.progresso); $('instrucao').textContent = r.mensagem;
+  if (!rodando) { rodando = true; laco(); }
+};
+
+$('btnSalvar').onclick = async () => {
+  const res = await fetch('/api/cadastro/finalizar', {method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({sessao, nome: $('nome').value, tipo: $('tipo').value})});
+  const r = await res.json();
+  if (!res.ok) { aviso(r.erro, 'erro'); return; }
+  aviso('Cadastro salvo com sucesso!', 'ok');
+  rodando = false; sessao = null; $('btnSalvar').disabled = true; $('nome').value = '';
+  $('instrucao').textContent = 'Cadastro concluído. Clique em “Iniciar captura” para outra pessoa.';
+  Camera.caixa(sobre, video, null); $('passos').innerHTML = '';
+  carregarLista();
+};
+
+async function carregarLista() {
+  const ps = await (await fetch('/api/pessoas')).json();
+  $('lista').innerHTML = ps.length ? ps.map(p => `
+    <div class="item"><img src="/api/pessoas/${p.id}/foto" onerror="this.outerHTML='<div class=avatar></div>'">
+      <div class="info"><b>${p.nome.replace(/</g,'&lt;')}</b><small>${p.tipo} · ${p.amostras} amostras</small></div>
+      <span class="tag ${p.ativo ? 'ok' : 'erro'}">${p.ativo ? 'ativo' : 'bloqueado'}</span>
+      <button class="sec" onclick="alternar(${p.id},${!p.ativo})">${p.ativo ? 'Bloquear' : 'Liberar'}</button>
+      <button class="sec perigo" onclick="excluir(${p.id})">✕</button></div>`).join('')
+    : '<small style="color:var(--mut)">Ninguém cadastrado ainda.</small>';
+}
+async function alternar(id, ativo) {
+  await fetch(`/api/pessoas/${id}/ativo`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ativo})});
+  carregarLista();
+}
+async function excluir(id) {
+  if (!confirm('Excluir este cadastro e os dados faciais?')) return;
+  await fetch(`/api/pessoas/${id}`, {method: 'DELETE'}); carregarLista();
+}
+carregarLista();
+</script>
+{% endblock %}

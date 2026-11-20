@@ -4,3 +4,4 @@ venv/
 rostos_cadastrados/
 __pycache__/
 *.pyc
+dados/
