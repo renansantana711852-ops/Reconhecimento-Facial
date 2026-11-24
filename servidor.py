@@ -5,6 +5,8 @@ Tela de cadastro da facial (captura guiada, várias poses). A portaria vem em ou
 Rodar:  python servidor.py   e abrir  http://localhost:5000
 (`localhost` é tratado pelo navegador como origem segura, então a câmera funciona.)
 """
+import hmac
+import os
 import time
 import uuid
 
@@ -16,6 +18,26 @@ import motor_facial as mf
 from armazenamento import Armazenamento
 
 app = Flask(__name__)
+
+# Proteção para o link público: se SENHA_ACESSO estiver definida, o navegador pede
+# usuário (qualquer um) + essa senha antes de mostrar qualquer página ou API.
+SENHA_ACESSO = os.environ.get("SENHA_ACESSO", "")
+
+
+@app.before_request
+def exigir_senha():
+    if not SENHA_ACESSO or request.path == "/saude":
+        return None
+    auth = request.authorization
+    if auth and hmac.compare_digest(auth.password or "", SENHA_ACESSO):
+        return None
+    return Response("Acesso restrito", 401, {"WWW-Authenticate": 'Basic realm="Cadastro facial"'})
+
+
+@app.get("/saude")
+def saude():
+    return "ok"
+
 motor = mf.MotorFacial()
 banco = Armazenamento()
 base = mf.BaseDeRostos()
@@ -249,6 +271,5 @@ def api_excluir(pid):
 
 
 if __name__ == "__main__":
-    import os
     app.run(host=os.environ.get("HOST", "127.0.0.1"), port=int(os.environ.get("PORT", 5000)),
             threaded=True)
