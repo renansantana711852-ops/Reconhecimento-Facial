@@ -14,7 +14,7 @@ from pathlib import Path
 
 import numpy as np
 
-PASTA = Path(__file__).parent / "dados"
+PASTA = Path(os.environ.get("DADOS_DIR") or Path(__file__).parent / "dados")  # DADOS_DIR: disco persistente na hospedagem
 ARQ_PESSOAS = PASTA / "pessoas.json"
 PASTA_FOTOS = PASTA / "fotos"
 

@@ -51,3 +51,23 @@ Recomendação: só liberar depois de **3 frames seguidos** com a mesma pessoa, 
 | `NITIDEZ_MIN` / `BRILHO_MIN` | 25 / 55 | rejeita imagem tremida / escura |
 
 Os scripts antigos (`cadastrar_rosto.py`, `reconhecimento_facial.py`, ...) foram mantidos como protótipo.
+
+## Publicando online (link público)
+
+A câmera do navegador só funciona em HTTPS, e hospedagens como o Render já dão HTTPS automático.
+
+1. Suba o código para o GitHub (branch `master`).
+2. No [Render](https://render.com): **New → Blueprint** (ou *Web Service*), escolha este repositório. O `render.yaml` já configura tudo.
+   Se criar manualmente: build `pip install -r requirements-deploy.txt`, start
+   `gunicorn servidor:app --workers 1 --threads 4 --timeout 120 --bind 0.0.0.0:$PORT`.
+3. Em **Environment**, defina `SENHA_ACESSO` com uma senha. O navegador vai pedir usuário (qualquer um) e essa senha.
+4. Abra o link `https://<nome>.onrender.com/cadastro`.
+
+Pontos de atenção:
+- **Use sempre 1 worker** (sessões de cadastro ficam em memória).
+- **Os cadastros somem** quando o serviço grátis reinicia/dorme (disco efêmero). Para manter, use um disco
+  persistente e aponte `DADOS_DIR` para ele. Para a apresentação, cadastre as pessoas pouco antes.
+- O plano grátis dorme após ~15 min sem uso (o primeiro acesso demora ~1 min) e tem pouca CPU: o
+  reconhecimento fica mais lento que no notebook. Abra o link antes de apresentar.
+- São **dados biométricos**: cadastre só quem concordou (o grupo), mantenha a senha ligada e exclua os
+  cadastros depois da apresentação.
