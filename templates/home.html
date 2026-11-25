@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block titulo %}Home{% endblock %}
+{% block conteudo %}
+<style>
+  .hm { --hm-fundo:#0B1120; --hm-card:#151E32; --hm-azul:#2563EB; --hm-ciano:#38BDF8;
+        --hm-texto:#FFFFFF; --hm-texto2:#94A3B8; --hm-borda:rgba(148,163,184,.15);
+        background:var(--hm-fundo); color:var(--hm-texto); line-height:1.6; }
+  .hm * { box-sizing:border-box; }
+  .hm a { text-decoration:none; }
+
+  .hm-hero { max-width:1100px; margin:0 auto; padding:64px 24px 48px;
+             display:grid; grid-template-columns:1.1fr .9fr; gap:48px; align-items:center; }
+  .hm-selo { display:inline-block; padding:6px 14px; border:1px solid var(--hm-borda);
+             border-radius:999px; background:var(--hm-card); color:var(--hm-ciano);
+             font-size:.85rem; margin-bottom:20px; }
+  .hm-hero h2 { font-size:clamp(2.2rem,5vw,3.4rem); line-height:1.15; margin:0 0 16px; color:var(--hm-texto); }
+  .hm-hero h2 span { background:linear-gradient(90deg,var(--hm-azul),var(--hm-ciano));
+                     -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .hm-hero p { color:var(--hm-texto2); font-size:1.1rem; max-width:520px; margin:0 0 32px; }
+  .hm-botoes { display:flex; gap:14px; flex-wrap:wrap; }
+  .hm-btn { display:inline-block; padding:14px 26px; border-radius:12px; font-weight:600;
+            font-size:1rem; transition:transform .15s, background .2s; }
+  .hm-btn:hover { transform:translateY(-2px); }
+  .hm-btn-p { background:var(--hm-azul); color:#fff; box-shadow:0 8px 24px rgba(37,99,235,.35); }
+  .hm-btn-p:hover { background:#1D4ED8; }
+  .hm-btn-s { background:transparent; color:var(--hm-ciano); border:1px solid var(--hm-ciano); }
+  .hm-btn-s:hover { background:rgba(56,189,248,.1); }
+
+  .hm-scanner { position:relative; width:100%; max-width:380px; aspect-ratio:1; margin:0 auto;
+                background:radial-gradient(circle at center,rgba(37,99,235,.25),transparent 70%);
+                border:1px solid var(--hm-borda); border-radius:24px; overflow:hidden;
+                display:grid; place-items:center; }
+  .hm-scanner svg.hm-rosto { width:62%; height:62%; }
+  .hm-canto { position:absolute; width:36px; height:36px; border:3px solid var(--hm-ciano); }
+  .hm-tl { top:18px; left:18px; border-right:0; border-bottom:0; border-top-left-radius:8px; }
+  .hm-tr { top:18px; right:18px; border-left:0; border-bottom:0; border-top-right-radius:8px; }
+  .hm-bl { bottom:18px; left:18px; border-right:0; border-top:0; border-bottom-left-radius:8px; }
+  .hm-br { bottom:18px; right:18px; border-left:0; border-top:0; border-bottom-right-radius:8px; }
+  .hm-linha { position:absolute; left:8%; right:8%; height:3px;
+              background:linear-gradient(90deg,transparent,var(--hm-ciano),transparent);
+              box-shadow:0 0 18px 4px rgba(56,189,248,.6); animation:hm-varrer 3s ease-in-out infinite; }
+  @keyframes hm-varrer { 0%{top:12%;opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{top:88%;opacity:0} }
+  @media (prefers-reduced-motion:reduce){ .hm-linha{animation:none; top:50%;} }
+
+  .hm-secao { max-width:1100px; margin:0 auto; padding:24px 24px 64px; }
+  .hm-secao h3 { text-align:center; font-size:1.8rem; margin:0 0 8px; color:var(--hm-texto); }
+  .hm-sub { text-align:center; color:var(--hm-texto2); margin:0 0 36px; }
+  .hm-cards { display:grid; grid-template-columns:repeat(4,1fr); gap:20px; }
+  .hm-cards.dois { grid-template-columns:repeat(2,1fr); }
+  a.hm-card { display:block; color:inherit; }
+  .hm-stats { max-width:1100px; margin:0 auto; padding:0 24px 40px; display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
+  .hm-stat { background:var(--hm-card); border:1px solid var(--hm-borda); border-radius:12px; padding:20px 24px; text-align:center; }
+  .hm-stat b { display:block; font-size:2rem; color:var(--hm-ciano); line-height:1.2; }
+  .hm-stat span { color:var(--hm-texto2); font-size:.9rem; }
+  .hm-card { background:var(--hm-card); border:1px solid var(--hm-borda); border-radius:12px;
+             padding:28px 24px; transition:transform .2s, border-color .2s; }
+  .hm-card:hover { transform:translateY(-4px); border-color:var(--hm-ciano); }
+  .hm-num { color:var(--hm-ciano); font-size:.8rem; font-weight:700; letter-spacing:1px; }
+  .hm-icone { width:48px; height:48px; border-radius:12px; background:rgba(37,99,235,.18);
+              display:grid; place-items:center; margin:12px 0 16px; }
+  .hm-icone svg { width:26px; height:26px; stroke:var(--hm-ciano); }
+  .hm-card h4 { font-size:1.2rem; margin:0 0 8px; color:var(--hm-texto); }
+  .hm-card p { color:var(--hm-texto2); font-size:.97rem; margin:0; }
+  .hm-caixa { background:var(--hm-card); border:1px solid var(--hm-borda); border-radius:12px;
+              padding:28px; color:var(--hm-texto2); max-width:760px; margin:0 auto; text-align:center; }
+  .hm-rodape { border-top:1px solid var(--hm-borda); text-align:center; padding:22px 24px;
+               color:var(--hm-texto2); font-size:.9rem; }
+
+  @media (max-width:860px){
+    .hm-hero { grid-template-columns:1fr; padding-top:40px; text-align:center; }
+    .hm-hero p { margin-left:auto; margin-right:auto; }
+    .hm-botoes { justify-content:center; }
+    .hm-cards, .hm-cards.dois { grid-template-columns:1fr; }
+    .hm-stats { grid-template-columns:1fr; }
+  }
+  @media (min-width:861px) and (max-width:1000px){ .hm-cards { grid-template-columns:repeat(2,1fr); } }
+</style>
+
+<div class="hm">
+  <section class="hm-hero">
+    <div>
+      <span class="hm-selo">Controle de acesso inteligente</span>
+      <h2>Reconhecimento <span>Facial</span></h2>
+      <p>Identificação rápida e segura utilizando tecnologia de reconhecimento facial.</p>
+      <div class="hm-botoes">
+        <a href="/reconhecimento" class="hm-btn hm-btn-p">Iniciar reconhecimento</a>
+        <a href="/cadastro" class="hm-btn hm-btn-s">Cadastrar rosto</a>
+      </div>
+    </div>
+
+    <div class="hm-scanner" aria-hidden="true">
+      <span class="hm-canto hm-tl"></span><span class="hm-canto hm-tr"></span>
+      <span class="hm-canto hm-bl"></span><span class="hm-canto hm-br"></span>
+      <svg class="hm-rosto" viewBox="0 0 200 200" fill="none" stroke="#38BDF8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <ellipse cx="100" cy="95" rx="55" ry="70"/>
+        <circle cx="78" cy="85" r="6"/><circle cx="122" cy="85" r="6"/>
+        <path d="M100 95v25l-8 4"/>
+        <path d="M80 140c12 10 28 10 40 0"/>
+        <g stroke="#2563EB" stroke-width="1.5" opacity=".7">
+          <path d="M78 85L100 120M122 85L100 120M78 85L122 85M80 140L100 120L120 140"/>
+        </g>
+        <g fill="#38BDF8" stroke="none">
+          <circle cx="78" cy="85" r="2.5"/><circle cx="122" cy="85" r="2.5"/>
+          <circle cx="100" cy="120" r="2.5"/><circle cx="80" cy="140" r="2.5"/><circle cx="120" cy="140" r="2.5"/>
+        </g>
+      </svg>
+      <div class="hm-linha"></div>
+    </div>
+  </section>
+
+  <section class="hm-stats" aria-label="Situação do sistema">
+    <div class="hm-stat"><b id="stTotal">–</b><span>pessoas cadastradas</span></div>
+    <div class="hm-stat"><b id="stAtivas">–</b><span>com acesso liberado</span></div>
+    <div class="hm-stat"><b id="stBloq">–</b><span>bloqueadas</span></div>
+  </section>
+
+  <section class="hm-secao">
+    <h3>Como funciona</h3>
+    <p class="hm-sub">Quatro etapas simples, do rosto à decisão de acesso.</p>
+    <div class="hm-cards">
+      <article class="hm-card">
+        <span class="hm-num">01</span>
+        <div class="hm-icone"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></div>
+        <h4>Captura</h4>
+        <p>A câmera registra a imagem do usuário.</p>
+      </article>
+      <article class="hm-card">
+        <span class="hm-num">02</span>
+        <div class="hm-icone"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></div>
+        <h4>Análise</h4>
+        <p>O sistema analisa as características faciais.</p>
+      </article>
+      <article class="hm-card">
+        <span class="hm-num">03</span>
+        <div class="hm-icone"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></div>
+        <h4>Identificação</h4>
+        <p>O rosto é comparado com os registros cadastrados.</p>
+      </article>
+      <article class="hm-card">
+        <span class="hm-num">04</span>
+        <div class="hm-icone"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg></div>
+        <h4>Decisão</h4>
+        <p>Após 3 leituras seguidas, o acesso é liberado ou bloqueado.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="hm-secao">
+    <h3>Telas do sistema</h3>
+    <p class="hm-sub">Acesse cada parte do projeto.</p>
+    <div class="hm-cards dois">
+      <a class="hm-card" href="/reconhecimento">
+        <span class="hm-num">PORTARIA</span>
+        <h4 style="margin-top:12px">Reconhecimento</h4>
+        <p>Simula o aparelho da portaria: lê o rosto pela câmera e mostra se o acesso foi liberado, bloqueado ou negado.</p>
+      </a>
+      <a class="hm-card" href="/cadastro">
+        <span class="hm-num">ADMINISTRAÇÃO</span>
+        <h4 style="margin-top:12px">Cadastro</h4>
+        <p>Captura guiada do rosto em várias poses, além de bloquear, liberar ou excluir pessoas cadastradas.</p>
+      </a>
+    </div>
+  </section>
+
+  <section class="hm-secao" id="sobre">
+    <h3>Sobre o projeto</h3>
+    <p class="hm-sub">Simulação de controle de acesso por reconhecimento facial.</p>
+    <div class="hm-caixa">
+      Projeto acadêmico que detecta o rosto (YuNet), gera um vetor de características (SFace) e compara
+      com as pessoas cadastradas para liberar ou bloquear o acesso. Os dados biométricos
+      são usados apenas para demonstração, com o consentimento de quem foi cadastrado.
+    </div>
+  </section>
+
+  <div class="hm-rodape">Projeto acadêmico • Reconhecimento Facial • 2026</div>
+</div>
+<script>
+(function () {
+  fetch('/api/pessoas').then(r => r.json()).then(ps => {
+    const ativas = ps.filter(p => p.ativo).length;
+    document.getElementById('stTotal').textContent = ps.length;
+    document.getElementById('stAtivas').textContent = ativas;
+    document.getElementById('stBloq').textContent = ps.length - ativas;
+  }).catch(() => {});
+})();
+</script>
+{% endblock %}

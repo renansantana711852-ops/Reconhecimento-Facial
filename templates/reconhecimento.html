@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block titulo %}Reconhecimento{% endblock %}
+{% block conteudo %}
+<style>
+  .rc-status { border-radius:14px; padding:22px 20px; text-align:center; border:1px solid rgba(148,163,184,.25);
+               background:rgba(148,163,184,.08); transition:background .25s, border-color .25s; }
+  .rc-status .rc-titulo { font-size:1.5rem; font-weight:800; letter-spacing:.5px; margin:0 0 4px; }
+  .rc-status .rc-detalhe { margin:0; opacity:.85; }
+  .rc-status.liberado { background:rgba(34,197,94,.15);  border-color:#22c55e; color:#22c55e; }
+  .rc-status.bloqueado{ background:rgba(245,158,11,.15); border-color:#f59e0b; color:#f59e0b; }
+  .rc-status.negado   { background:rgba(239,68,68,.15);  border-color:#ef4444; color:#ef4444; }
+  .rc-pessoa { display:flex; align-items:center; justify-content:center; gap:12px; margin-top:14px; }
+  .rc-pessoa img { width:64px; height:64px; border-radius:50%; object-fit:cover; border:2px solid currentColor; }
+  .rc-pessoa b { display:block; font-size:1.05rem; }
+  .rc-pessoa small { opacity:.8; }
+  .rc-pontos { display:flex; justify-content:center; gap:8px; margin-top:14px; min-height:12px; }
+  .rc-pontos i { width:12px; height:12px; border-radius:50%; background:rgba(148,163,184,.35); }
+  .rc-pontos i.on { background:#38bdf8; }
+  .rc-hist { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
+  .rc-hist li { display:flex; justify-content:space-between; gap:10px; align-items:center;
+                padding:8px 10px; border-radius:8px; background:rgba(148,163,184,.08); font-size:.92rem; }
+  .rc-hist .rc-hora { opacity:.7; font-variant-numeric:tabular-nums; }
+  .rc-hist .rc-tag { font-weight:700; font-size:.78rem; padding:2px 8px; border-radius:999px; white-space:nowrap; }
+  .rc-tag.liberado  { background:rgba(34,197,94,.2);  color:#22c55e; }
+  .rc-tag.bloqueado { background:rgba(245,158,11,.2); color:#f59e0b; }
+  .rc-tag.negado    { background:rgba(239,68,68,.2);  color:#ef4444; }
+  .rc-vazio { opacity:.7; font-size:.9rem; }
+</style>
+
+<main>
+  <section class="card">
+    <h2>Portaria</h2>
+    <div class="palco">
+      <div class="espelho"><video id="video" playsinline muted></video><canvas id="sobre"></canvas></div>
+      <div class="faixa" id="instrucao">Clique em “Iniciar reconhecimento”</div>
+    </div>
+    <div class="debug" id="debug"></div>
+    <select id="camSel" style="margin-top:8px;display:none"></select>
+  </section>
+
+  <aside style="display:flex;flex-direction:column;gap:20px">
+    <section class="card">
+      <h2>Resultado</h2>
+      <div class="rc-status espera" id="status" aria-live="polite">
+        <p class="rc-titulo" id="stTitulo">AGUARDANDO</p>
+        <p class="rc-detalhe" id="stDetalhe">Posicione o rosto em frente à câmera.</p>
+        <div class="rc-pessoa" id="stPessoa" style="display:none">
+          <img id="stFoto" alt="">
+          <div style="text-align:left"><b id="stNome"></b><small id="stTipo"></small></div>
+        </div>
+      </div>
+      <div class="rc-pontos" id="pontos" aria-hidden="true"><i></i><i></i><i></i></div>
+      <button id="btnIniciar">Iniciar reconhecimento</button>
+      <button id="btnParar" class="sec" disabled>Parar</button>
+      <div id="aviso"></div>
+    </section>
+
+    <section class="card">
+      <h2>Últimos acessos</h2>
+      <ul class="rc-hist" id="hist"><li class="rc-vazio">Nenhum acesso registrado nesta sessão.</li></ul>
+    </section>
+  </aside>
+</main>
+{% endblock %}
+
+{% block script %}
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const video = $('video'), sobre = $('sobre'), tmp = document.createElement('canvas');
+  const CONFIRMAR = 3;          // frames seguidos com a mesma pessoa antes de decidir
+  const PAUSA_RESULTADO = 4000; // ms mostrando o resultado antes de ler a próxima pessoa
+  const aguardar = ms => new Promise(r => setTimeout(r, ms));
+
+  let rodando = false, token = 0, seq = {chave: null, n: 0};
+
+  function aviso(txt) { $('aviso').innerHTML = txt ? '<div class="msg erro"></div>' : ''; if (txt) $('aviso').firstChild.textContent = txt; }
+
+  function pontos(n) {
+    [...$('pontos').children].forEach((el, i) => el.classList.toggle('on', i < n));
+  }
+
+  function mostrar(cls, titulo, detalhe, pessoa) {
+    $('status').className = 'rc-status ' + cls;
+    $('stTitulo').textContent = titulo;
+    $('stDetalhe').textContent = detalhe;
+    const bloco = $('stPessoa');
+    if (pessoa) {
+      $('stFoto').src = '/api/pessoas/' + pessoa.id + '/foto';
+      $('stFoto').onerror = function () { this.style.display = 'none'; };
+      $('stFoto').style.display = '';
+      $('stNome').textContent = pessoa.nome;
+      $('stTipo').textContent = pessoa.tipo;
+      bloco.style.display = 'flex';
+    } else {
+      bloco.style.display = 'none';
+    }
+  }
+
+  function espera() {
+    mostrar('espera', 'AGUARDANDO', 'Posicione o rosto em frente à câmera.');
+    pontos(0);
+  }
+
+  function registrar(cls, rotulo, nome) {
+    const ul = $('hist');
+    if (ul.querySelector('.rc-vazio')) ul.innerHTML = '';
+    const li = document.createElement('li');
+    const hora = document.createElement('span'); hora.className = 'rc-hora';
+    hora.textContent = new Date().toLocaleTimeString('pt-BR');
+    const quem = document.createElement('span'); quem.textContent = nome; quem.style.flex = '1';
+    const tag = document.createElement('span'); tag.className = 'rc-tag ' + cls; tag.textContent = rotulo;
+    li.append(hora, quem, tag);
+    ul.prepend(li);
+    while (ul.children.length > 8) ul.lastChild.remove();
+  }
+
+  function cor(r) {
+    if (r.estado === 'reconhecido') return r.pessoa.ativo ? '#22c55e' : '#f59e0b';
+    if (r.estado === 'desconhecido') return '#ef4444';
+    if (r.estado === 'problema' || r.estado === 'varios') return '#f59e0b';
+    return '#3b82f6';
+  }
+
+  // Decide o acesso depois de CONFIRMAR frames seguidos
+  function decidir(r) {
+    if (r.estado === 'reconhecido' && r.pessoa.ativo) {
+      mostrar('liberado', 'ACESSO LIBERADO', 'Bem-vindo(a)!', r.pessoa);
+      registrar('liberado', 'Liberado', r.pessoa.nome);
+    } else if (r.estado === 'reconhecido') {
+      mostrar('bloqueado', 'ACESSO BLOQUEADO', 'Cadastro bloqueado. Procure a administração.', r.pessoa);
+      registrar('bloqueado', 'Bloqueado', r.pessoa.nome);
+    } else {
+      mostrar('negado', 'NÃO RECONHECIDO', 'Rosto sem cadastro. Acesso negado.');
+      registrar('negado', 'Negado', 'Desconhecido');
+    }
+  }
+
+  async function laco(meu) {
+    while (rodando && meu === token) {
+      const t0 = performance.now();
+      try {
+        const blob = await Camera.capturar(video, tmp);
+        const r = await (await fetch('/api/reconhecimento/frame', {method: 'POST', body: blob})).json();
+        if (!rodando || meu !== token) break;
+
+        Camera.caixa(sobre, video, r.caixa, cor(r));
+        $('debug').textContent = r.largura ? 'rosto com ' + Math.round(r.largura) + 'px de largura' : '';
+        $('instrucao').textContent = r.mensagem || '';
+
+        let chave = null;
+        if (r.estado === 'reconhecido') chave = 'p' + r.pessoa.id + (r.pessoa.ativo ? 'a' : 'b');
+        else if (r.estado === 'desconhecido') chave = 'desconhecido';
+
+        if (chave === null) {            // sem rosto / problema / várias pessoas: zera a contagem
+          seq = {chave: null, n: 0};
+          espera();
+        } else {
+          seq = (seq.chave === chave) ? {chave, n: seq.n + 1} : {chave, n: 1};
+          pontos(seq.n);
+          if (seq.n >= CONFIRMAR) {
+            decidir(r);
+            seq = {chave: null, n: 0};
+            await aguardar(PAUSA_RESULTADO);
+            if (!rodando || meu !== token) break;
+            espera();
+            $('instrucao').textContent = 'Pronto para a próxima pessoa';
+            Camera.caixa(sobre, video, null);
+          }
+        }
+      } catch (e) {
+        $('instrucao').textContent = 'Erro de comunicação com o servidor';
+        await aguardar(1000);
+      }
+      await aguardar(Math.max(0, 150 - (performance.now() - t0)));
+    }
+  }
+
+  function pararCamera() {
+    rodando = false; token++;
+    if (video.srcObject) { video.srcObject.getTracks().forEach(t => t.stop()); video.srcObject = null; }
+    Camera.caixa(sobre, video, null);
+    $('btnIniciar').disabled = false; $('btnParar').disabled = true;
+  }
+
+  $('btnIniciar').onclick = async () => {
+    aviso('');
+    try {
+      const dim = await Camera.abrir(video, $('camSel').value || undefined);
+      $('debug').textContent = 'câmera em ' + dim.w + 'x' + dim.h;
+      const cams = await Camera.listar();
+      if (cams.length > 1 && !$('camSel').options.length) {
+        $('camSel').innerHTML = cams.map((c, i) => '<option value="' + c.deviceId + '">' + (c.label || 'Câmera ' + (i + 1)) + '</option>').join('');
+        $('camSel').style.display = 'block';
+        $('camSel').onchange = () => { pararCamera(); $('btnIniciar').click(); };
+      }
+    } catch (e) { aviso('Não foi possível abrir a câmera: ' + e.message); return; }
+    seq = {chave: null, n: 0}; espera();
+    $('instrucao').textContent = 'Olhe para a câmera';
+    $('btnIniciar').disabled = true; $('btnParar').disabled = false;
+    rodando = true; token++; laco(token);
+  };
+
+  $('btnParar').onclick = () => {
+    pararCamera(); espera();
+    $('instrucao').textContent = 'Reconhecimento parado';
+  };
+})();
+</script>
+{% endblock %}
