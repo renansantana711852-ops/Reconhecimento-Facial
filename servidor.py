@@ -100,12 +100,17 @@ def pose_do_rosto(pose):
 # ------------------------------------------------------------------------------
 @app.get("/")
 def inicio():
-    return redirect("/cadastro")
+    return render_template("home.html")
 
 
 @app.get("/cadastro")
 def pagina_cadastro():
     return render_template("cadastro.html")
+
+
+@app.get("/reconhecimento")
+def pagina_reconhecimento():
+    return render_template("reconhecimento.html")
 
 
 # ------------------------------------------------------------------------------
@@ -264,6 +269,45 @@ def api_excluir(pid):
     banco.excluir_pessoa(pid)
     recarregar_base()
     return jsonify(ok=True)
+
+
+# ------------------------------------------------------------------------------
+# API de reconhecimento (portaria)
+# ------------------------------------------------------------------------------
+# Cada chamada analisa UM frame. A regra "3 frames seguidos com a mesma pessoa" fica
+# na tela (templates/reconhecimento.html), como recomendado no README.
+@app.post("/api/reconhecimento/frame")
+def reconhecimento_frame():
+    img = decodificar()
+    info = motor.analisar(img)
+    resp = {"rosto": False, "estado": "sem_rosto", "mensagem": "Aproxime-se da câmera"}
+    if info["rosto"] is None:
+        return jsonify(resp)
+
+    resp.update(rosto=True, caixa=info["caixa"], largura=info["largura"])
+    if info["n_rostos"] > 1:
+        resp.update(estado="varios", mensagem="Mais de uma pessoa na imagem: uma por vez")
+        return jsonify(resp)
+
+    problemas = motor.problemas_reconhecimento(info)
+    if problemas:
+        resp.update(estado="problema", mensagem=msg_problema(problemas))
+        return jsonify(resp)
+
+    vetor = motor.embedding(img, info["rosto"])
+    pid, score, segundo = base.comparar(vetor)
+    resp["score"] = round(float(score), 3)
+    if pid is not None and base.aceito(score, segundo):
+        pessoa = banco.obter_pessoa(pid)
+        if pessoa:
+            resp.update(
+                estado="reconhecido",
+                mensagem="Rosto reconhecido",
+                pessoa={k: pessoa[k] for k in ("id", "nome", "tipo", "ativo")},
+            )
+            return jsonify(resp)
+    resp.update(estado="desconhecido", mensagem="Rosto não reconhecido")
+    return jsonify(resp)
 
 
 # A portaria (tela que simula o aparelho) usa `motor`, `base` e `banco` daqui: ver
